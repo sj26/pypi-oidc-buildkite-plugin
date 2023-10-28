@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+
+import json
+import os
+import subprocess
+import sys
+from http import HTTPStatus
+from urllib.error import HTTPError
+from urllib.parse import urljoin, urlparse
+from urllib.request import urlopen, Request
+
+def die(*msg):
+    # https://buildkite.com/docs/pipelines/managing-log-output#collapsing-output
+    print("^^^ +++", file=sys.stderr)
+    print("🚨 Trusted publishing exchange failure:", file=sys.stderr)
+    print(*msg, sep="\n", file=sys.stderr)
+    sys.exit(1)
+
+repository_url = os.getenv("BUILDKITE_PLUGIN_PYPI_OIDC_REPOSITORY_URL", "https://upload.pypi.org/legacy/")
+repository_domain = urlparse(repository_url).netloc
+
+# Indices are expected to support `https://{domain}/_/oidc/audience`,
+# which tells OIDC exchange clients which audience to use.
+audience_url = urljoin(repository_url, "/_/oidc/audience")
+audience_response = urlopen(audience_url)
+
+if audience_response.status != 200:
+    match audience_response.status_code:
+        case HTTPStatus.FORBIDDEN:
+            # This index supports OIDC, but forbids the client from using
+            # it (either because it's disabled, ratelimited, etc.)
+            die(f"audience retrieval failed: repository at {repository_domain} has trusted publishing disabled")
+        case HTTPStatus.NOT_FOUND:
+            # This index does not support OIDC.
+            die(f"audience retrieval failed: repository at {repository_domain} does not indicate trusted publishing support")
+        case other:
+            status = HTTPStatus(other)
+            # Unknown: the index may or may not support OIDC, but didn't respond with
+            # something we expect. This can happen if the index is broken, in maintenance mode,
+            # misconfigured, etc.
+            die("audience retrieval failed: repository at {repository_domain} responded with unexpected {other}: {status.phrase}")
+
+oidc_audience = json.load(audience_response)["audience"]
+oidc_lifetime = os.getenv("BUILDKITE_PLUGIN_PYPI_OIDC_LIFETIME", "60")
+
+oidc_process = subprocess.run(["buildkite-agent", "oidc", "request-token", "--audience", oidc_audience, "--lifetime", oidc_lifetime], text=True, capture_output=True)
+if oidc_process.returncode != 0:
+    die("buildkite oidc request-token failed:", oidc_process.stderr)
+
+oidc_token = oidc_process.stdout.strip()
+
+token_url = urljoin(repository_url, "/_/oidc/buildkite/mint-token")
+token_data = json.dumps({"token": oidc_token})
+token_request = Request(token_url, headers={"Content-Type": "application/json"}, data=token_data.encode("utf-8"))
+try:
+    token_response = urlopen(token_request)
+except HTTPError as err:
+    # Python warehouse returns a 422 as detailed errors in json
+    if err.code == 422:
+        die(
+            f"token exchange failed: {err.code} {err.reason}:",
+            *(f"* `{error['code']}`: {error['description']}" for error in json.load(err)["errors"])
+        )
+    else:
+        die(f"token exchange failed: {err.code} {err.reason}:", err.read())
+
+print(json.load(token_response)["token"], end="")

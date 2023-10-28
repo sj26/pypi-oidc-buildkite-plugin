@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+export TWINE_USERNAME="__token__"
+export TWINE_PASSWORD="$("${BASH_SOURCE%/*}/../request-token")"
