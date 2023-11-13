@@ -1,5 +1,8 @@
 # PyPI Buildkite OIDC support
 
+> [!NOTE]
+> This is not yet generally available, but [work is in progress](https://github.com/pypi/warehouse/pull/14814).
+
 Securely push [Python packages] from your [Buildkite] pipelines. Exchanges a [Buildkite OIDC token] as a [trusted publisher] on [PyPI], the Python Package Index. Exports `TWINE_USERNAME` and `TWINE_PASSWORD` for use by [Twine].
 
 ```yaml
