@@ -17,7 +17,7 @@ class JSONResponse(io.BytesIO):
 
 
 class RequestTokenTests(unittest.TestCase):
-    def test_requests_pipeline_id_and_exchanges_at_generic_endpoint(self):
+    def test_requests_publisher_ids_and_exchanges_at_generic_endpoint(self):
         agent_process = subprocess.CompletedProcess(
             args=[], returncode=0, stdout="buildkite-jwt\n", stderr=""
         )
@@ -52,7 +52,7 @@ class RequestTokenTests(unittest.TestCase):
                 "--lifetime",
                 "60",
                 "--claim",
-                "pipeline_id",
+                "organization_id,pipeline_id",
             ],
             text=True,
             capture_output=True,

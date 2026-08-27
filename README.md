@@ -17,10 +17,10 @@ steps:
       python -m twine upload dist/*
 ```
 
-The plugin requests Buildkite's immutable `pipeline_id` as an additional OIDC
-claim. This allows a PyPI trusted publisher to pin authorization to one pipeline
-without replacing Buildkite's default OIDC subject. Publishers that do not use
-pipeline ID pinning remain compatible.
+The plugin requests Buildkite's immutable `organization_id` and `pipeline_id`
+as additional OIDC claims. This allows a PyPI trusted publisher to independently
+trust-on-first-use pin authorization to one organization and pipeline without
+replacing Buildkite's default OIDC subject.
 
 For TestPyPI, point both the plugin and Twine at TestPyPI:
 
