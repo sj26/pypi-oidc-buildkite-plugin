@@ -22,6 +22,10 @@ as additional OIDC claims. This allows a PyPI trusted publisher to independently
 trust-on-first-use pin authorization to one organization and pipeline without
 replacing Buildkite's default OIDC subject.
 
+The plugin also requests `jti` (JWT ID), enabling Warehouse's existing
+replay protection to reject a second exchange of the same OIDC token. This does
+not make the returned PyPI upload token single-use.
+
 For TestPyPI, point both the plugin and Twine at TestPyPI:
 
 ```yaml

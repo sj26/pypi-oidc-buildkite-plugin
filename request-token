@@ -64,7 +64,7 @@ oidc_process = subprocess.run(
         "--lifetime",
         oidc_lifetime,
         "--claim",
-        "organization_id,pipeline_id",
+        "organization_id,pipeline_id,jti",
     ],
     text=True,
     capture_output=True,
