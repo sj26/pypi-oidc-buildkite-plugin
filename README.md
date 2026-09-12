@@ -10,7 +10,7 @@ Securely push [Python packages] from your [Buildkite] pipelines. Exchanges a [Bu
 steps:
   - label: ":python: Build and publish to PyPI"
     plugins:
-      - sj26/pypi-oidc#buildkite-trusted-publishing: ~
+      - sj26/pypi-oidc#v0.1.0: ~
     command: |
       python -m pip install --upgrade build twine
       python -m build
@@ -28,7 +28,7 @@ For TestPyPI, point both the plugin and Twine at TestPyPI:
 steps:
   - label: ":test-tube: Build and publish to TestPyPI"
     plugins:
-      - sj26/pypi-oidc#buildkite-trusted-publishing:
+      - sj26/pypi-oidc#v0.1.0:
           repository_url: https://test.pypi.org/legacy/
     command: |
       python -m pip install --upgrade build twine
@@ -45,9 +45,18 @@ steps:
 
 ## Requirements
 
-Python 3 [supported versions], and the standard library. No packages are used outside the standard library.
+- Buildkite agent v3.45.0 or newer, which supports additional OIDC claims.
+- Bash and Python 3.10 or newer ([supported versions]), using only the standard library.
 
 [supported versions]: https://devguide.python.org/versions/
+
+## Development and releases
+
+Run the tests with `python3 -m unittest discover -s tests -v`.
+
+Releases use immutable `vMAJOR.MINOR.PATCH` tags. Before publishing a GitHub
+Release from `main`, run the tests and update the README examples to the new
+version. Never move an existing version tag; publish a new version for fixes.
 
 ## Thanks
 

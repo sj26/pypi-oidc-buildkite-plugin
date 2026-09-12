@@ -27,15 +27,7 @@ class RequestTokenTests(unittest.TestCase):
         ]
 
         with (
-            mock.patch.dict(
-                os.environ,
-                {
-                    "BUILDKITE_PLUGIN_PYPI_OIDC_REPOSITORY_URL": (
-                        "https://upload.pypi.org/legacy/"
-                    ),
-                    "BUILDKITE_PLUGIN_PYPI_OIDC_LIFETIME": "60",
-                },
-            ),
+            mock.patch.dict(os.environ, {}, clear=True),
             mock.patch("urllib.request.urlopen", side_effect=responses) as urlopen,
             mock.patch("subprocess.run", return_value=agent_process) as run,
             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout,
