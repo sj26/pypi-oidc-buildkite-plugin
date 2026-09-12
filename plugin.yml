@@ -1,0 +1,22 @@
+name: PyPI OIDC
+description: Securely publish Python packages to PyPI using Buildkite OIDC
+author: https://github.com/sj26
+requirements:
+  - bash
+  - python3
+  - buildkite-agent
+configuration:
+  properties:
+    repository_url:
+      type: string
+      description: The Python package repository upload URL.
+      default: https://upload.pypi.org/legacy/
+    lifetime:
+      description: The requested OIDC token lifetime in seconds.
+      oneOf:
+        - type: string
+          pattern: '^[1-9][0-9]*$'
+        - type: integer
+          minimum: 1
+      default: "60"
+  additionalProperties: false

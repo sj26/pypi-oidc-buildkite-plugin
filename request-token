@@ -54,23 +54,37 @@ if audience_response.status != 200:
 oidc_audience = json.load(audience_response)["audience"]
 oidc_lifetime = os.getenv("BUILDKITE_PLUGIN_PYPI_OIDC_LIFETIME", "60")
 
-oidc_process = subprocess.run(
-    [
-        "buildkite-agent",
-        "oidc",
-        "request-token",
-        "--audience",
-        oidc_audience,
-        "--lifetime",
-        oidc_lifetime,
-        "--claim",
-        "organization_id,pipeline_id,jti",
-    ],
-    text=True,
-    capture_output=True,
-)
-if oidc_process.returncode != 0:
-    die("buildkite oidc request-token failed:", oidc_process.stderr)
+try:
+    oidc_process = subprocess.run(
+        [
+            "buildkite-agent",
+            "oidc",
+            "request-token",
+            "--audience",
+            oidc_audience,
+            "--lifetime",
+            oidc_lifetime,
+            "--claim",
+            "organization_id,pipeline_id,jti",
+        ],
+        text=True,
+        capture_output=True,
+    )
+except OSError as err:
+    die(
+        f"Unable to run buildkite-agent: {err}",
+        "Install Buildkite agent v3.45.0+ and ensure buildkite-agent is on PATH.",
+        "Run this plugin inside a Buildkite job, not from a local shell.",
+    )
+
+if oidc_process.returncode != 0 or not oidc_process.stdout.strip():
+    die(
+        "buildkite-agent oidc request-token failed or returned an empty token:",
+        oidc_process.stderr.strip(),
+        "Use Buildkite agent v3.45.0+ (required for --claim) inside a running Buildkite job.",
+        "Check the agent error above and its connectivity to Buildkite; do not paste tokens into logs.",
+        "See https://buildkite.com/docs/agent/v3/cli-oidc",
+    )
 
 oidc_token = oidc_process.stdout.strip()
 
