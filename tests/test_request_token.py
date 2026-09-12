@@ -44,7 +44,7 @@ class RequestTokenTests(unittest.TestCase):
                 "--lifetime",
                 "60",
                 "--claim",
-                "organization_id,pipeline_id",
+                "organization_id,pipeline_id,jti",
             ],
             text=True,
             capture_output=True,
