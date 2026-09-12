@@ -7,12 +7,12 @@ import unittest
 
 from pathlib import Path
 from unittest import mock
+from urllib.error import HTTPError, URLError
 
 
 class JSONResponse(io.BytesIO):
-    status = 200
-
-    def __init__(self, value):
+    def __init__(self, value, status=200):
+        self.status = status
         super().__init__(json.dumps(value).encode())
 
 
@@ -95,6 +95,134 @@ class RequestTokenTests(unittest.TestCase):
                 self.assertIn("v3.45.0+", stderr.getvalue())
                 self.assertIn("Buildkite job", stderr.getvalue())
                 self.assertNotIn("sensitive-partial-token", stderr.getvalue())
+
+    def test_custom_repository_audience_and_lifetime(self):
+        with (
+            mock.patch.dict(
+                os.environ,
+                {
+                    "BUILDKITE_PLUGIN_PYPI_OIDC_REPOSITORY_URL": "https://test.pypi.org/legacy/",
+                    "BUILDKITE_PLUGIN_PYPI_OIDC_LIFETIME": "120",
+                },
+                clear=True,
+            ),
+            mock.patch(
+                "urllib.request.urlopen",
+                side_effect=[
+                    JSONResponse({"audience": "testpypi"}),
+                    JSONResponse({"token": "testpypi-token"}),
+                ],
+            ) as urlopen,
+            mock.patch(
+                "subprocess.run",
+                return_value=subprocess.CompletedProcess([], 0, "testpypi-jwt\n", ""),
+            ) as run,
+            mock.patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            runpy.run_path(Path(__file__).parents[1] / "request-token")
+
+        self.assertEqual(
+            run.call_args.args[0],
+            [
+                "buildkite-agent",
+                "oidc",
+                "request-token",
+                "--audience",
+                "testpypi",
+                "--lifetime",
+                "120",
+                "--claim",
+                "organization_id,pipeline_id,jti",
+            ],
+        )
+        self.assertEqual(
+            urlopen.call_args_list[0].args[0], "https://test.pypi.org/_/oidc/audience"
+        )
+        self.assertEqual(
+            urlopen.call_args.args[0].full_url,
+            "https://test.pypi.org/_/oidc/mint-token",
+        )
+        self.assertEqual(
+            json.loads(urlopen.call_args.args[0].data), {"token": "testpypi-jwt"}
+        )
+        self.assertEqual(stdout.getvalue(), "testpypi-token")
+
+    def test_repository_errors_stop_with_diagnostics(self):
+        for stage, failure, diagnostic in (
+            (
+                "audience",
+                JSONResponse({"audience": "pypi"}, status=204),
+                "expected HTTP 200, got 204",
+            ),
+            (
+                "audience",
+                HTTPError("", 403, "Forbidden", {}, None),
+                "trusted publishing disabled",
+            ),
+            (
+                "audience",
+                HTTPError("", 404, "Not Found", {}, None),
+                "does not indicate trusted publishing support",
+            ),
+            ("audience", HTTPError("", 503, "Service Unavailable", {}, None), "503"),
+            ("audience", URLError("connection refused"), "network access"),
+            ("exchange", URLError("connection refused"), "network access"),
+            (
+                "exchange",
+                HTTPError("", 403, "Forbidden", {}, io.BytesIO(b"forbidden")),
+                "403",
+            ),
+            (
+                "exchange",
+                HTTPError(
+                    "",
+                    422,
+                    "Unprocessable Entity",
+                    {},
+                    JSONResponse(
+                        {
+                            "errors": [
+                                {
+                                    "code": "invalid-reuse-token",
+                                    "description": "Token already used",
+                                }
+                            ]
+                        }
+                    ),
+                ),
+                "invalid-reuse-token",
+            ),
+        ):
+            with self.subTest(stage=stage, diagnostic=diagnostic):
+                responses = (
+                    [failure]
+                    if stage == "audience"
+                    else [
+                        JSONResponse({"audience": "pypi"}),
+                        failure,
+                    ]
+                )
+                with (
+                    mock.patch.dict(os.environ, {}, clear=True),
+                    mock.patch(
+                        "urllib.request.urlopen", side_effect=responses
+                    ) as urlopen,
+                    mock.patch(
+                        "subprocess.run",
+                        return_value=subprocess.CompletedProcess([], 0, "test-jwt", ""),
+                    ) as run,
+                    mock.patch("sys.stdout", new_callable=io.StringIO) as stdout,
+                    mock.patch("sys.stderr", new_callable=io.StringIO) as stderr,
+                    self.assertRaises(SystemExit) as raised,
+                ):
+                    runpy.run_path(Path(__file__).parents[1] / "request-token")
+
+                self.assertEqual(raised.exception.code, 1)
+                self.assertIn(diagnostic, stderr.getvalue())
+                self.assertEqual(stdout.getvalue(), "")
+                self.assertNotIn("test-jwt", stderr.getvalue())
+                self.assertEqual(urlopen.call_count, len(responses))
+                self.assertEqual(run.call_count, 0 if stage == "audience" else 1)
 
 
 if __name__ == "__main__":

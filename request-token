@@ -5,7 +5,7 @@ import os
 import subprocess
 import sys
 from http import HTTPStatus
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
@@ -27,10 +27,10 @@ repository_domain = urlparse(repository_url).netloc
 # Indices are expected to support `https://{domain}/_/oidc/audience`,
 # which tells OIDC exchange clients which audience to use.
 audience_url = urljoin(repository_url, "/_/oidc/audience")
-audience_response = urlopen(audience_url)
-
-if audience_response.status != 200:
-    match audience_response.status_code:
+try:
+    audience_response = urlopen(audience_url)
+except HTTPError as err:
+    match err.code:
         case HTTPStatus.FORBIDDEN:
             # This index supports OIDC, but forbids the client from using
             # it (either because it's disabled, ratelimited, etc.)
@@ -42,14 +42,18 @@ if audience_response.status != 200:
             die(
                 f"audience retrieval failed: repository at {repository_domain} does not indicate trusted publishing support"
             )
-        case other:
-            status = HTTPStatus(other)
-            # Unknown: the index may or may not support OIDC, but didn't respond with
-            # something we expect. This can happen if the index is broken, in maintenance mode,
-            # misconfigured, etc.
+        case _:
             die(
-                "audience retrieval failed: repository at {repository_domain} responded with unexpected {other}: {status.phrase}"
+                f"audience retrieval failed: repository at {repository_domain} responded with {err.code}: {err.reason}"
             )
+except URLError as err:
+    die(
+        f"audience retrieval failed: {err.reason}",
+        "Check repository_url and network access to the repository.",
+    )
+
+if audience_response.status != 200:
+    die(f"audience retrieval failed: expected HTTP 200, got {audience_response.status}")
 
 oidc_audience = json.load(audience_response)["audience"]
 oidc_lifetime = os.getenv("BUILDKITE_PLUGIN_PYPI_OIDC_LIFETIME", "60")
@@ -109,5 +113,10 @@ except HTTPError as err:
         )
     else:
         die(f"token exchange failed: {err.code} {err.reason}:", err.read())
+except URLError as err:
+    die(
+        f"token exchange failed: {err.reason}",
+        "Check repository_url and network access to the repository.",
+    )
 
 print(json.load(token_response)["token"], end="")

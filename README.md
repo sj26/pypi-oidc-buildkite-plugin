@@ -10,7 +10,7 @@ Securely push [Python packages] from your [Buildkite] pipelines. Exchanges a [Bu
 steps:
   - label: ":python: Build and publish to PyPI"
     plugins:
-      - sj26/pypi-oidc#v0.1.0: ~
+      - sj26/pypi-oidc#v0.2.0: ~
     command: |
       python -m pip install --upgrade build twine
       python -m build
@@ -32,7 +32,7 @@ For TestPyPI, point both the plugin and Twine at TestPyPI:
 steps:
   - label: ":test-tube: Build and publish to TestPyPI"
     plugins:
-      - sj26/pypi-oidc#v0.1.0:
+      - sj26/pypi-oidc#v0.2.0:
           repository_url: https://test.pypi.org/legacy/
     command: |
       python -m pip install --upgrade build twine
