@@ -1,0 +1,20 @@
+# Security note: this repository-controlled pipeline cannot enforce its own
+# upload restrictions. Adoption must configure a trusted pipeline bootstrap to
+# gate pipeline uploads before this file is evaluated.
+steps:
+  - label: ":python: Tests"
+    command: python3 -B -m unittest discover -s tests -v
+    plugins:
+      - docker#v5.14.0:
+          image: python:3.10-slim
+
+  - label: ":sparkles: Lint"
+    plugins:
+      - plugin-linter#v3.3.0:
+          id: sj26/pypi-oidc
+
+  - label: ":shell: Shellcheck"
+    plugins:
+      - shellcheck#v1.4.0:
+          files:
+            - hooks/**

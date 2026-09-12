@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
 
+if ! TWINE_PASSWORD="$("${BASH_SOURCE[0]%/*}/../request-token")" || [[ -z "$TWINE_PASSWORD" ]]; then
+  echo "^^^ +++" >&2
+  echo "PyPI authentication failed; stopping before package publication." >&2
+  echo "Check the error above, use Buildkite agent v3.45.0+ inside a running Buildkite job," >&2
+  echo "and confirm the repository supports Buildkite trusted publishing and has a matching trusted publisher." >&2
+  echo "See the plugin README's Troubleshooting section for setup guidance." >&2
+  exit 1
+fi
+
 export TWINE_USERNAME="__token__"
-export TWINE_PASSWORD="$("${BASH_SOURCE%/*}/../request-token")"
+export TWINE_PASSWORD
